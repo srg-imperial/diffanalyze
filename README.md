@@ -83,3 +83,9 @@ Assuming you have `brew` installed:
 
 ## Known issues
 The matplotlib graphs can look weird when inspecting a small number (e.g. 4) of patches with the `--range` arguments.
+
+## Requirements
+
+Use ```python3 setup.py``` to install it and its dependencies.
+
+Use ```python3 setup.py develop``` for development
