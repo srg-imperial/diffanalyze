@@ -10,7 +10,9 @@ The information given below can also be briefly accessed via the `--help, -h` fl
 
 ### Updated functions
 Sample usage:
-`./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git -hash HEAD --print-mode full`
+```
+./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git -hash HEAD --print-mode full
+```
 
 The first argument is always required: it is the URL of the repo that is to be queried
 
@@ -86,6 +88,6 @@ The matplotlib graphs can look weird when inspecting a small number (e.g. 4) of 
 
 ## Requirements
 
-Use ```python3 setup.py``` to install it and its dependencies.
-
-Use ```python3 setup.py develop``` for development
+* install dependencies: `pip3 install --user -e .`
+* Use ```python3 setup.py --user``` to install it
+* Use ```python3 setup.py --user develop``` for development
