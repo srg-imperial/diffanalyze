@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from io import StringIO
 from os.path import dirname
 
@@ -20,7 +21,6 @@ GIT_EMPTY_TREE_ID = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # Takes care of where the output from print goes and provides some utility functions
 class OutputManager:
     should_print = False
-    old_stdout = sys.stdout
     output = StringIO()
 
     @staticmethod
@@ -56,7 +56,6 @@ class OutputManager:
     def print_all(only_fn):
         strs = OutputManager.output.getvalue().strip().split('\n') if not only_fn else list(
             dict.fromkeys(OutputManager.output.getvalue().strip().split('\n')))
-        sys.stdout = OutputManager.old_stdout
         for str in strs:
             if str and str != '\n':
                 print(str)
@@ -72,13 +71,13 @@ class ChangedLinesManager:
 
     def print_added_lines(self):
         if self.added_lines:
-            print(self.patch_msg + ' (new file indices): [', end='')
+            print(self.patch_msg + ' (new line indices): [', end='')
             print(*self.added_lines, end='')
             print(']')
 
     def print_removed_lines(self):
         if self.removed_lines:
-            print(self.patch_msg + ' (old file indices): [', end='')
+            print(self.patch_msg + ' (rem line indices): [', end='')
             print(*self.removed_lines, end='')
             print(']')
 
@@ -100,11 +99,11 @@ class FnAttributes:
 # Computes and stores the targets, as lines of added code
 class FileDifferences:
 
-    def __init__(self, filename, patch):
+    def __init__(self, filename, patch, old_path, new_path):
         self.filename = filename
         self.file_extension = FileDifferences.get_extension(filename)
-        self.current_fn_map = self.get_fn_names(prev=False)
-        self.prev_fn_map = self.get_fn_names(prev=True)
+        self.current_fn_map = self.get_fn_names(new_path)
+        self.prev_fn_map = self.get_fn_names(old_path)
         self.fn_to_changed_lines = {}
         self.patch_commit = patch
 
@@ -116,18 +115,18 @@ class FileDifferences:
         else:
             return 'none'
 
-    def get_fn_names(self, prev):
-        fn_map = {}
-        target = os.getcwd() + '/repo/' + self.filename if not prev else os.getcwd() + '/repo_prev/' + self.filename
+    def get_fn_names(self, path):
         proc = subprocess.Popen(
-            ['universalctags', '-x', '--c-kinds=fp', '--fields=+ne', '--output-format=json', target],
+            ['universalctags', '-x', '--c-kinds=fp', '--fields=+ne', '--output-format=json', os.path.join(path, self.filename)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         out, err = proc.communicate()
 
         if err:
-            return fn_map
+            print(err)
+            return {} # no content
 
+        fn_map = {}
         fn_table = out.decode('utf-8').strip().split('\n')
 
         # TODO: only looks at function code excluding prototypes - maybe sometime changing prototypes would be useful
@@ -194,10 +193,11 @@ class FileDifferences:
             fn_list_file.close()
 
     def print_simple(self):
+        print('# Commit: %s' % colored(self.patch_commit, 'grey'))
         for fn_name, lines in self.fn_to_changed_lines.items():
             if lines:
                 for line in self.fn_to_changed_lines[fn_name].added_lines:
-                    print('%s: %s' % (colored(self.filename, 'blue'), line))
+                    print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
 
 
 class DiffSummary:
@@ -227,14 +227,12 @@ class DiffSummary:
 # Handles all interactions with the git repository
 class RepoManager:
 
-    def __init__(self, repo_url, cache, print_mode, save_json, track_json):
+    def __init__(self, repo_url, print_mode, save_json, track_json):
         self.repo_url = repo_url
-        self.cache = cache
         self.allowed_extensions = ['.c']  # , '.h']
         self.print_mode = print_mode
         self.fn_updated_per_commit = {}
         self.other_changed = {}
-        self.cloned_repos_paths = []
         self.original_commit = None
         self.save_json = save_json
         self.track_json = track_json
@@ -242,61 +240,44 @@ class RepoManager:
     def get_repo_paths(self):
         # Path where repo is supposed to be
         cwd = os.getcwd()
-        return cwd + '/repo', cwd + '/repo_prev'
+        return os.path.join(cwd, 'repo')
 
     # Handles the cloning of a repo
     def clone_repo(self, repo_path, rev=''):
-        repo = None
-
         try:
-            repo = pygit2.clone_repository(self.repo_url, repo_path)
+            return pygit2.clone_repository(self.repo_url, repo_path, bare=True)
         except pygit2.GitError:
             username = input('Enter git username: ')
             password = getpass.getpass('Enter git password: ')
             cred = pygit2.UserPass(username, password)
             try:
-                repo = pygit2.clone_repository(self.repo_url, repo_path,
+                return pygit2.clone_repository(self.repo_url, repo_path, bare=True,
                                                callbacks=pygit2.RemoteCallbacks(credentials=cred))
             except ValueError:
                 print("Invalid URL!")
                 sys.exit(1)
         except Exception as e:
-            print(e)
-            sys.exit(1)
 
-        return repo
+            print(e)
+
+        print("Could not clone repository")
+        sys.exit(1)
 
     def get_repo(self, repo_path, rev=''):
-        # Keep track of paths of cloned repos
-        self.cloned_repos_paths.append(repo_path)
-
         # Check if we have a repo
-        discover_repo_path = pygit2.discover_repository(repo_path, 0, dirname(os.getcwd()))
+        discover_repo_path = pygit2.discover_repository(repo_path, 0, repo_path)
 
         repo = None
 
         # No repo found
         if discover_repo_path is None:
             OutputManager.print("No repo found. Cloning...")
-            repo = self.clone_repo(repo_path, rev)
+
+            # Clone as bare repository
+            repo = self.clone_repo(repo_path)
             OutputManager.print("Cloned repo.")
-            current_commit = repo.revparse_single('HEAD')
-            OutputManager.print('Current commit (patch): ' + current_commit.hex)
 
             repo = pygit2.Repository(pygit2.discover_repository(repo_path, 0, dirname(os.getcwd())))
-
-            if rev:
-                OutputManager.print('Changing to desired commit...')
-                try:
-                    change = repo.revparse_single(rev).hex
-                except:
-                    sys.stdout = OutputManager.old_stdout
-                    print('Could not parse git revision. Please enter a valid hash (symbols like ^, ~ are permitted)')
-                    sys.exit(1)
-                hash_oid = pygit2.Oid(hex=change)
-                repo.reset(hash_oid, pygit2.GIT_RESET_HARD)
-                OutputManager.print('Changed to %s.' % (change,))
-
             return repo
 
         # If not repo:
@@ -304,44 +285,13 @@ class RepoManager:
 
         # A different repo is found
         if repo.remotes['origin'].url != self.repo_url:
-            OutputManager.print("Found repo is incorrect. Cloning required repo...")
-
-            # Remove existing contents
-            shutil.rmtree(repo_path)
-
-            # Clone
-            repo = self.clone_repo(repo_path, rev)
-
-            OutputManager.print("Cloned repo.")
-            current_commit = repo.revparse_single('HEAD')
-            OutputManager.print('Current commit (patch): ' + current_commit.hex)
-
-        else:
-            # Found repo is correct, but HEAD may not be pointing to desired commit
-            OutputManager.print('Found required repo.')
-            OutputManager.print('Current commit (patch): ' + repo.revparse_single('HEAD').hex)
-
-            # Check that commits match
-            current_commit = repo.revparse_single('HEAD')
-            target_commit = None
-            try:
-                target_commit = repo.revparse_single(rev)
-            except:
-                sys.stdout = OutputManager.old_stdout
-                print('Could not parse git revision. Please enter a valid hash (symbols like ^, ~ are permitted)')
-                sys.exit(1)
-
-            if target_commit and current_commit.hex != target_commit.hex:
-                OutputManager.print('Changing to desired commit...')
-                hash_oid = pygit2.Oid(hex=target_commit.hex)
-                repo.reset(hash_oid, pygit2.GIT_RESET_HARD)
-                OutputManager.print('Changed to %s.' % (target_commit.hex,))
+            OutputManager.print("Found repo is incorrect. Should be:", self.repo_url, "but is:", repo.remotes['origin'].url)
+            sys.exit(1)
 
         return repo
 
-    def compute_diffs(self, diff, patch_hash=''):
+    def compute_diffs(self, patches, commit_new, commit_old, old_repo, new_repo, clone_old_path, clone_new_path):
         diff_summary = DiffSummary()
-        patches = list(diff.__iter__())
 
         updated_fn_count = 0
         has_c_files = False
@@ -355,23 +305,35 @@ class RepoManager:
                 if extension not in self.other_changed:
                     self.other_changed[extension] = set()
 
-                self.other_changed[extension].add(patch_hash)
+                self.other_changed[extension].add(commit_new.hex)
                 continue
 
             has_c_files = True
+            try:
+                old_repo.checkout(refname=commit_old)
+            except:
+                pass
 
-            diff_data = FileDifferences(filename, patch_hash)
+            try:
+                new_repo.checkout(refname=commit_new)
+            except:
+                pass
+
+            diff_data = FileDifferences(filename, commit_new.hex, old_path=clone_old_path, new_path=clone_new_path)
 
             for hunk in patch.hunks:
                 new_fn_lines = []
                 old_fn_lines = []
 
                 for diff_line in hunk.lines:
-                    if diff_line.content.strip():
-                        if diff_line.new_lineno > -1:
-                            new_fn_lines.append(diff_line.new_lineno)
-                        else:
-                            old_fn_lines.append(diff_line.old_lineno)
+                    # Check if the line contains non-whitespace changes
+                    if not diff_line.content.strip():
+                        continue
+
+                    if diff_line.new_lineno > -1:
+                        new_fn_lines.append(diff_line.new_lineno)
+                    else:
+                        old_fn_lines.append(diff_line.old_lineno)
 
                 if diff_data.match_lines_to_fn(new_fn_lines, old_fn_lines):
                     has_updated_fn = True
@@ -382,41 +344,60 @@ class RepoManager:
             c_ext = '.c'
             if c_ext not in self.other_changed:
                 self.other_changed[c_ext] = set()
-            self.other_changed[c_ext].add(patch_hash)
+            self.other_changed[c_ext].add(commit_new.hex)
 
         return diff_summary
 
-    def compare_patches_in_range(self, patch_rev, times=1, target_commit=None):
-        curr_repo_path, _ = self.get_repo_paths()
-        curr_repo = self.get_repo(curr_repo_path, patch_rev)
+    def compare_patches_in_range(self, start_revision, end_revision=None):
+        curr_repo_path = self.get_repo_paths()
+        curr_repo = self.get_repo(curr_repo_path, start_revision)
 
-        distance_to_target = 1
-        if target_commit:
-            target = curr_repo.revparse_single(target_commit)
-            for commit in curr_repo.walk(curr_repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL):
-                if commit.hex == target.hex:
-                    break
-                distance_to_target += 1
+        commit_new = curr_repo.revparse_single(start_revision)
+        commit_old = curr_repo.revparse_single(end_revision if end_revision else start_revision+"~1")
 
-        if target_commit:
-            times = distance_to_target
+        clone_old = tempfile.mkdtemp()
+        clone_new = tempfile.mkdtemp()
 
-        for i in range(times):
-            head = 'HEAD~'
-            prev = curr_repo.revparse_single(head + str(i + 1))
-            curr = curr_repo.revparse_single(head + str(i))
+        # create clones:
+        orig_path = self.get_repo_paths()
 
-            OutputManager.print("Comparing with previous commit: " + prev.hex)
+        proc = subprocess.Popen(
+            ['git', 'clone', "file://" + orig_path, clone_old],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
 
-            diff = curr_repo.diff(prev, curr, context_lines=0)
-            diff_summary = self.compute_diffs(diff, curr.hex)
+        if proc.returncode and err:
+            print(err)
+
+        proc = subprocess.Popen(
+            ['git', 'clone', "file://" + orig_path, clone_new],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+
+        if proc.returncode and err:
+            print(err)
+
+
+        old_repo = pygit2.repository.Repository(clone_old)
+        new_repo = pygit2.repository.Repository(clone_new)
+
+
+        # Initialise a commit walker from the the newest
+        walker = curr_repo.walk(commit_new.id, pygit2.GIT_SORT_TIME | pygit2.GIT_SORT_REVERSE)
+        prev_commit = curr_repo.revparse_single(commit_old.hex+"~1")
+        # Stop at the selected oldest
+        walker.hide(commit_old.id)
+        for commit in walker:
+            diff = curr_repo.diff(commit.parents[0], commit, context_lines=0)
+            diff_summary = self.compute_diffs(diff, commit, prev_commit, old_repo, new_repo, clone_old, clone_new)
+            prev_commit = commit
             OutputManager.print_relevant_diff(diff_summary, self.print_mode)
 
-        # Restore repo to original state
-        master = curr_repo.branches['master']
-        hash_oid = pygit2.Oid(hex=master.upstream.target.hex)
-        curr_repo.reset(hash_oid, pygit2.GIT_RESET_HARD)
-        OutputManager.print('Restored to %s' % (curr_repo.revparse_single('HEAD').hex,))
+        shutil.rmtree(clone_old)
+        shutil.rmtree(clone_new)
+
+
+
 
     @staticmethod
     def repo_to_commit(repo, commit_hash):
@@ -446,7 +427,7 @@ class RepoManager:
 
         updates_json = {}
 
-        curr_repo_path, prev_repo_path = self.get_repo_paths()
+        curr_repo_path = self.get_repo_paths()
 
         patch_repo = self.get_repo(curr_repo_path)
         original_repo = self.get_repo(prev_repo_path)
@@ -602,9 +583,8 @@ class RepoManager:
             shutil.rmtree(cwd + '/repo_prev')
 
     def cleanup(self):
-        if not self.cache:
-            for path in self.cloned_repos_paths:
-                shutil.rmtree(path)
+        pass
+
 
 
 ##### Main program #####
@@ -613,11 +593,10 @@ def main(main_args):
     parser = argparse.ArgumentParser(
         description='Outputs a list of patched functions and the corresponding source code lines.')
 
-    parser.add_argument('gitrepo', metavar='repo', help='git repo url')
-    parser.add_argument('-hash', help='patch hash')
+    parser.add_argument('gitrepo', metavar='repo', help='git repo url or local path file:///')
+    parser.add_argument('--revision', help='repository revision')
     parser.add_argument('--print-mode', dest='print', choices=['full', 'simple', 'only-fn'], default='full',
                         help='print format')
-    parser.add_argument('-c', '--cache', action='store_true', help='do not delete cloned repos after finishing')
     parser.add_argument('--verbose', action='store_true', help='display helpful progress messages')
     parser.add_argument('-s', '--summary', action='store_true', help='prints a summary of the data')
     parser.add_argument('-p', '--plot', action='store_true', help='save graphs of the generated data')
@@ -638,30 +617,25 @@ def main(main_args):
     # Handle printing
     OutputManager.should_print = bool(args['verbose'])
 
-    repo_manager = RepoManager(args['gitrepo'], bool(args['cache']), args['print'], bool(args['json']), args['track'])
+    repo_manager = RepoManager(args['gitrepo'], args['print'], bool(args['json']), args['track'])
 
-    sys.stdout = OutputManager.output
-
-    if args['hash'] and not args['rangeInt'] and not args['range']:
-        repo_manager.compare_patches_in_range(args['hash'], times=1)
-    elif args['hash'] and args['range']:
-        repo_manager.compare_patches_in_range(args['hash'], target_commit=args['range'])
-    elif args['hash'] and args['rangeInt']:
-        repo_manager.compare_patches_in_range(args['hash'], times=int(args['rangeInt']))
-    elif (args['plot'] or args['summary']) and args['range']:
-        repo_manager.get_updated_fn_per_commit(args['skip'], end_hash=args['range'])
-    elif (args['plot'] or args['summary']) and args['rangeInt']:
-        repo_manager.get_updated_fn_per_commit(args['skip'], times=int(args['rangeInt']))
+    if args['revision']:
+        repo_manager.compare_patches_in_range(args['revision'],args['range'])
     elif args['plot'] or args['summary']:
-        repo_manager.get_updated_fn_per_commit(args['skip'])
+        if args['range']:
+            repo_manager.get_updated_fn_per_commit(args['skip'], end_hash=args['range'])
+        elif args['rangeInt']:
+            repo_manager.get_updated_fn_per_commit(args['skip'], times=int(args['rangeInt']))
+        else:
+            repo_manager.get_updated_fn_per_commit(args['skip'])
 
     if args['summary']:
         repo_manager.summary()
 
     if args['plot']:
-        plt.switch_backend('Qt4Agg')
-        manager = plt.get_current_fig_manager()
-        manager.window.showMaximized()
+        plt.switch_backend('MacOSX')
+        # manager = plt.get_current_fig_manager()
+        # manager.window.showMaximized()
 
         repo_manager.plot_fn_per_commit(args['skip'])
         repo_manager.plot_fn_per_commit_restricted(args['skip'], args['limit'])
