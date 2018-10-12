@@ -11,19 +11,21 @@ The information given below can also be briefly accessed via the `--help, -h` fl
 ### Updated functions
 Sample usage:
 ```
-./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git -hash HEAD --print-mode full
+./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git --revision HEAD --print-mode full
+# Show last 4 patches
+./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git --revision HEAD --range HEAD~4 --print-mode full
+
 ```
 
 The first argument is always required: it is the URL of the repo that is to be queried
 
 Optional arguments:
-- `-hash HASH` - this is the patch commit hash we are interested in; the script will compare this revision to the previos one and output the patch updates. It supports normal git revision features: `HEAD~`, `HEAD^3`, `ba6be28~2`, etc.
+- `--revision HASH` - this is the patch commit hash we are interested in; the script will compare this revision to the previos one and output the patch updates. It supports normal git revision features: `HEAD~`, `HEAD^3`, `ba6be28~2`, etc.
 - `--print-mode` - has 3 possible values: *full*, *simple*, *only-fn*.
     - `full` - prints a human readable version, including the updated function name, source file, and newly added lines
     - `simple` - outputs the source file name and source code line number, for each newly added line in the patch
     - `only-fn` - outputs only the names of the functions that were updated in the patch, one per line
 - `--verbose` - prints some additional information about what the script is doing (repo already cloned, current commit, etc.)
-- `--cache, -c` - doesn't delete the cloned repository after the script finishes - useful if you want to avoid cloning each time
 - `--rangeInt, -ri N` - Looks at N patches, starting from `HASH` (directions is newer -> older commits)
 - `--range, -rh INIT_HASH` - Looks at patches between `HASH` (newest) and `INIT_HASH` (oldest) (inclusive, directions is newer -> older commits)
 
@@ -81,8 +83,7 @@ Assuming you have `brew` installed:
 - `pip3 installl matplotlib`
 - `pip3 install pyqt5`
 - `pip3 install termcolor`
-- `git clone https://github.com/universal-ctags/ctags; cd ctags; ./autogen.sh; ./configure --program-prefix=universal; make`
-
+- `brew install --HEAD universal-ctags/universal-ctags/universal-ctags`
 ## Known issues
 The matplotlib graphs can look weird when inspecting a small number (e.g. 4) of patches with the `--range` arguments.
 
