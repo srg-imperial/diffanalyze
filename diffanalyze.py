@@ -178,7 +178,7 @@ class FileDifferences:
 
         if not pretty:
             OutputManager.print('Updated functions:')
-            fn_list_file = open('../updated_functions', 'a')
+            fn_list_file = open('./updated_functions', 'a')
 
         for fn_name, lines in self.fn_to_changed_lines.items():
             if pretty and lines:
