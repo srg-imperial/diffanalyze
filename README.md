@@ -25,6 +25,7 @@ Optional arguments:
     - `full` - prints a human readable version, including the updated function name, source file, and newly added lines
     - `simple` - outputs the source file name and source code line number, for each newly added line in the patch
     - `only-fn` - outputs only the names of the functions that were updated in the patch, one per line
+    - `functions` - prints list of file,function,hash
 - `--verbose` - prints some additional information about what the script is doing (repo already cloned, current commit, etc.)
 - `--rangeInt, -ri N` - Looks at N patches, starting from `HASH` (directions is newer -> older commits)
 - `--range, -rh INIT_HASH` - Looks at patches between `HASH` (newest) and `INIT_HASH` (oldest) (inclusive, directions is newer -> older commits)

@@ -34,6 +34,11 @@ class OutputManager:
             diff_data.print(pretty)
 
     @staticmethod
+    def print_diff_summary_functions(diff_summary):
+        for diff_data in diff_summary.file_diffs:
+            diff_data.print_functions()
+
+    @staticmethod
     def print_diff_summary_simple(diff_summary):
         for diff_data in diff_summary.file_diffs:
             diff_data.print_simple()
@@ -42,6 +47,10 @@ class OutputManager:
     def print_relevant_diff(diff_summary, print_mode):
         if print_mode == 'simple':
             OutputManager.print_diff_summary_simple(diff_summary)
+            return
+
+        if print_mode == 'functions':
+            OutputManager.print_diff_summary_functions(diff_summary)
             return
 
         if print_mode == 'only-fn':
@@ -191,6 +200,10 @@ class FileDifferences:
 
         if not pretty:
             fn_list_file.close()
+
+    def print_functions(self):
+        for fn_name, lines in self.fn_to_changed_lines.items():
+            print("{},{},{}".format(self.filename, fn_name, self.patch_commit))
 
     def print_simple(self):
         print('# Commit: %s' % colored(self.patch_commit, 'grey'))
@@ -598,7 +611,7 @@ def main(main_args):
 
     parser.add_argument('gitrepo', metavar='repo', help='git repo url or local path file:///')
     parser.add_argument('--revision', help='repository revision')
-    parser.add_argument('--print-mode', dest='print', choices=['full', 'simple', 'only-fn'], default='full',
+    parser.add_argument('--print-mode', dest='print', choices=['full', 'simple', 'only-fn', 'functions'], default='full',
                         help='print format')
     parser.add_argument('--verbose', action='store_true', help='display helpful progress messages')
     parser.add_argument('-s', '--summary', action='store_true', help='prints a summary of the data')
