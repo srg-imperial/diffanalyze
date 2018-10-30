@@ -265,7 +265,10 @@ class RepoManager:
 
     def get_repo(self, repo_path, rev=''):
         # Check if we have a repo
-        discover_repo_path = pygit2.discover_repository(repo_path, 0, repo_path)
+        try:
+            discover_repo_path = pygit2.discover_repository(repo_path, 0, repo_path)
+        except KeyError:
+            discover_repo_path = None
 
         repo = None
 
