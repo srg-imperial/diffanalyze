@@ -13,8 +13,8 @@ check_linux_package () {
         echo "$1 OK."
     else
         echo "$1 is not installed. Attempting to install (Ubuntu)..."
-	pkg=$1
-	if ! [ -z "$2" ]; then pkg=$2; fi
+    pkg=$1
+    if ! [ -z "$2" ]; then pkg=$2; fi
         sudo apt-get --assume-yes install $pkg > /dev/null 2>&1
         if [ $? -eq 0 ]; then 
             echo "$1 OK."
@@ -99,16 +99,16 @@ check_tkinter
 
 echo "Checking if libgit2 is installed..."
 if ! [ -f /usr/local/lib/libgit2.so ]; then
-	echo "libgit2 is not installed. Attempting to install (Ubuntu)..."
-	wget https://github.com/libgit2/libgit2/archive/v0.27.0.tar.gz > /dev/null 2>&1
-	tar xzf v0.27.0.tar.gz
-	cd libgit2-0.27.0/
-	cmake . > /dev/null 2>&1
-	make > /dev/null 2>&1
-	sudo make install > /dev/null 2>&1
-	cd ..
+    echo "libgit2 is not installed. Attempting to install (Ubuntu)..."
+    wget https://github.com/libgit2/libgit2/archive/v0.27.0.tar.gz > /dev/null 2>&1
+    tar xzf v0.27.0.tar.gz
+    cd libgit2-0.27.0/
+    cmake . > /dev/null 2>&1
+    make > /dev/null 2>&1
+    sudo make install > /dev/null 2>&1
+    cd ..
 else
-	echo "libgit2 OK."
+    echo "libgit2 OK."
 fi
 
 echo "Installing universal-ctags..."
