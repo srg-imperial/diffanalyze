@@ -12,9 +12,12 @@ The information given below can also be briefly accessed via the `--help, -h` fl
 Sample usage:
 ```
 ./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git --revision HEAD --print-mode full
-# Show last 4 patches
+# show last 4 patches
 ./diffanalyze.py https://git.savannah.gnu.org/git/findutils.git --revision HEAD --range HEAD~4 --print-mode full
-
+# show functions with added lines from last two commits
+./diffanalyze.py /path/repo --revision HEAD --range HEAD~2 --print-mode=functions --with-hash --only-added
+# show file,function,line for all added lines from last two commits
+./diffanalyze.py /path/repo --revision HEAD --range HEAD~1 --print-mode simple
 ```
 
 The first argument is always required: it is the URL of the repo that is to be queried
@@ -26,6 +29,8 @@ Optional arguments:
     - `simple` - outputs the source file name and source code line number, for each newly added line in the patch
     - `only-fn` - outputs only the names of the functions that were updated in the patch, one per line
     - `functions` - prints list of file,function,hash
+- `--with-hash` - print git hashes in --print-mode=functions
+- `--only-added` - print only added lines in --print-mode=functions
 - `--verbose` - prints some additional information about what the script is doing (repo already cloned, current commit, etc.)
 - `--rangeInt, -ri N` - Looks at N patches, starting from `HASH` (directions is newer -> older commits)
 - `--range, -rh INIT_HASH` - Looks at patches between `HASH` (newest) and `INIT_HASH` (oldest) (inclusive, directions is newer -> older commits)

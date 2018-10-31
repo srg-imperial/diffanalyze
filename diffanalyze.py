@@ -22,6 +22,8 @@ GIT_EMPTY_TREE_ID = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 class OutputManager:
     should_print = False
     output = StringIO()
+    only_added = False
+    with_hash = False
 
     @staticmethod
     def print(*args, **kwargs):
@@ -36,7 +38,7 @@ class OutputManager:
     @staticmethod
     def print_diff_summary_functions(diff_summary):
         for diff_data in diff_summary.file_diffs:
-            diff_data.print_functions()
+            diff_data.print_functions(OutputManager.only_added, OutputManager.with_hash)
 
     @staticmethod
     def print_diff_summary_simple(diff_summary):
@@ -132,7 +134,7 @@ class FileDifferences:
         out, err = proc.communicate()
 
         if err:
-            print(err)
+            sys.stderr.write(err.decode('utf-8'))
             return {} # no content
 
         fn_map = {}
@@ -201,12 +203,16 @@ class FileDifferences:
         if not pretty:
             fn_list_file.close()
 
-    def print_functions(self):
-        for fn_name, lines in self.fn_to_changed_lines.items():
-            print("{},{},{}".format(self.filename, fn_name, self.patch_commit))
+    def print_functions(self, only_added, with_hash):
+        for fn_name,_ in self.fn_to_changed_lines.items():
+            if not only_added or self.fn_to_changed_lines[fn_name].added_lines:
+                output = "{},{}".format(self.filename, fn_name)
+                if with_hash:
+                    output += ',' + self.patch_commit
+                print(output)
 
     def print_simple(self):
-        print('# Commit: %s' % colored(self.patch_commit, 'grey'))
+        print('# Commit: %s' % self.patch_commit)
         for fn_name, lines in self.fn_to_changed_lines.items():
             if lines:
                 for line in self.fn_to_changed_lines[fn_name].added_lines:
@@ -613,6 +619,8 @@ def main(main_args):
     parser.add_argument('--revision', help='repository revision')
     parser.add_argument('--print-mode', dest='print', choices=['full', 'simple', 'only-fn', 'functions'], default='full',
                         help='print format')
+    parser.add_argument('--with-hash', action='store_true', help='print git hashes in --print-mode=functions')
+    parser.add_argument('--only-added', action='store_true', help='print only added lines in --print-mode=functions')
     parser.add_argument('--verbose', action='store_true', help='display helpful progress messages')
     parser.add_argument('-s', '--summary', action='store_true', help='prints a summary of the data')
     parser.add_argument('-p', '--plot', action='store_true', help='save graphs of the generated data')
@@ -632,6 +640,8 @@ def main(main_args):
 
     # Handle printing
     OutputManager.should_print = bool(args['verbose'])
+    OutputManager.with_hash = bool(args['with_hash'])
+    OutputManager.only_added = bool(args['only_added'])
 
     repo_manager = RepoManager(args['gitrepo'], args['print'], bool(args['json']), args['track'])
 
