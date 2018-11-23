@@ -193,11 +193,17 @@ class FileDifferences:
 
         for fn_name, lines in self.fn_to_changed_lines.items():
             if pretty and lines:
-                print('%s: In function %s' % (colored(self.filename, 'blue'), colored(fn_name, 'green')))
+                if sys.stdout.isatty():
+                    print('%s: In function %s' % (colored(self.filename, 'blue'), colored(fn_name, 'green')))
+                else:
+                    print('{}: In function {}'.format(self.filename, fn_name))
                 self.fn_to_changed_lines[fn_name].print_added_lines()
                 self.fn_to_changed_lines[fn_name].print_removed_lines()
             elif lines:
-                print('%s' % colored(fn_name, 'green'))
+                if sys.stdout.isatty():
+                    print('%s' % colored(fn_name, 'green'))
+                else:
+                    print('%s' % fn_name)
                 fn_list_file.write('%s\n' % fn_name)
 
         if not pretty:
@@ -216,7 +222,10 @@ class FileDifferences:
         for fn_name, lines in self.fn_to_changed_lines.items():
             if lines:
                 for line in self.fn_to_changed_lines[fn_name].added_lines:
-                    print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
+                    if sys.stdout.isatty():
+                        print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
+                    else:
+                        print('{},{},{}'.format(self.filename, fn_name, line))
 
 
 class DiffSummary:
