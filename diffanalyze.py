@@ -43,7 +43,7 @@ class OutputManager:
     @staticmethod
     def print_diff_summary_simple(diff_summary):
         for diff_data in diff_summary.file_diffs:
-            diff_data.print_simple()
+            diff_data.print_simple(OutputManager.only_added)
 
     @staticmethod
     def print_relevant_diff(diff_summary, print_mode):
@@ -217,15 +217,22 @@ class FileDifferences:
                     output += ',' + self.patch_commit
                 print(output)
 
-    def print_simple(self):
+    def print_simple(self, only_added):
         print('# Commit: %s' % self.patch_commit)
-        for fn_name, lines in self.fn_to_changed_lines.items():
-            if lines:
-                for line in self.fn_to_changed_lines[fn_name].added_lines:
-                    if sys.stdout.isatty():
-                        print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
-                    else:
-                        print('{},{},{}'.format(self.filename, fn_name, line))
+        fn_names = list(self.fn_to_changed_lines.keys())
+        fn_names.sort()
+        for fn_name in fn_names:
+            line_manager = self.fn_to_changed_lines[fn_name]
+            lines = line_manager.added_lines
+            if not only_added:
+                lines += line_manager.removed_lines
+                lines = list(set(lines))
+            lines.sort()
+            for line in lines:
+                if sys.stdout.isatty():
+                    print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
+                else:
+                    print('{},{},{}'.format(self.filename, fn_name, line))
 
 
 class DiffSummary:

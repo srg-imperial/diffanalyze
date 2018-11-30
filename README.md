@@ -17,7 +17,7 @@ Sample usage:
 # show functions with added lines from last two commits
 ./diffanalyze.py /path/repo --revision HEAD --range HEAD~2 --print-mode=functions --with-hash --only-added
 # show file,function,line for all added lines from last two commits
-./diffanalyze.py /path/repo --revision HEAD --range HEAD~1 --print-mode simple
+./diffanalyze.py /path/repo --revision HEAD --range HEAD~1 --print-mode simple --only-added
 ```
 
 The first argument is always required: it is the URL of the repo that is to be queried
@@ -26,11 +26,11 @@ Optional arguments:
 - `--revision HASH` - this is the patch commit hash we are interested in; the script will compare this revision to the previos one and output the patch updates. It supports normal git revision features: `HEAD~`, `HEAD^3`, `ba6be28~2`, etc.
 - `--print-mode` - has 3 possible values: *full*, *simple*, *only-fn*.
     - `full` - prints a human readable version, including the updated function name, source file, and newly added lines
-    - `simple` - outputs the source file name and source code line number, for each newly added line in the patch
+    - `simple` - outputs the source file name and source code line number, for each changed line in the patch
     - `only-fn` - outputs only the names of the functions that were updated in the patch, one per line
     - `functions` - prints list of file,function,hash
 - `--with-hash` - print git hashes in --print-mode=functions
-- `--only-added` - print only added lines in --print-mode=functions
+- `--only-added` - print only added lines in --print-mode=functions/simple
 - `--verbose` - prints some additional information about what the script is doing (repo already cloned, current commit, etc.)
 - `--rangeInt, -ri N` - Looks at N patches, starting from `HASH` (directions is newer -> older commits)
 - `--range, -rh INIT_HASH` - Looks at patches between `HASH` (newest) and `INIT_HASH` (oldest) (inclusive, directions is newer -> older commits)
