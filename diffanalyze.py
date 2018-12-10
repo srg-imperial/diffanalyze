@@ -106,6 +106,9 @@ class FnAttributes:
         self.end_line = end
         self.prototype = trim_prototype(prototype)
 
+    def __repr__(self):
+        return "{}: {}-{} ({})".format(self.fn_name, self.start_line, self.end_line, self.prototype)
+
 
 # Computes and stores the targets, as lines of added code
 class FileDifferences:
@@ -347,15 +350,21 @@ class RepoManager:
                 continue
 
             has_c_files = True
-            try:
-                old_repo.checkout(refname=commit_old)
-            except:
-                pass
+            proc = subprocess.Popen(
+                ['git', '-C', clone_old_path, 'checkout', str(commit_old.id)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
 
-            try:
-                new_repo.checkout(refname=commit_new)
-            except:
-                pass
+            if proc.returncode and err:
+                print(err)
+
+            proc = subprocess.Popen(
+                ['git', '-C', clone_new_path, 'checkout', str(commit_new.id)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+
+            if proc.returncode and err:
+                print(err)
 
             diff_data = FileDifferences(filename, commit_new.hex, old_path=clone_old_path, new_path=clone_new_path)
 
@@ -422,7 +431,7 @@ class RepoManager:
 
         # Initialise a commit walker from the the newest
         walker = curr_repo.walk(commit_new.id, pygit2.GIT_SORT_TIME | pygit2.GIT_SORT_REVERSE)
-        prev_commit = curr_repo.revparse_single(commit_old.hex+"~1")
+        prev_commit = curr_repo.revparse_single(commit_old.hex)
         # Stop at the selected oldest
         walker.hide(commit_old.id)
         for commit in walker:
