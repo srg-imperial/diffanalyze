@@ -18,6 +18,8 @@ Sample usage:
 ./diffanalyze.py /path/repo --revision HEAD --range HEAD~2 --print-mode=functions --with-hash --only-added
 # show file,function,line for all added lines from last two commits
 ./diffanalyze.py /path/repo --revision HEAD --range HEAD~1 --print-mode simple --only-added
+# show file,function,line for all added lines in src/file.* from last two commits
+./diffanalyze.py /path/repo --revision HEAD --range HEAD~1 --print-mode simple --only-added --path-filter 'src/file.*'
 ```
 
 The first argument is always required: it is the URL of the repo that is to be queried
@@ -34,6 +36,7 @@ Optional arguments:
 - `--verbose` - prints some additional information about what the script is doing (repo already cloned, current commit, etc.)
 - `--rangeInt, -ri N` - Looks at N patches, starting from `HASH` (directions is newer -> older commits)
 - `--range, -rh INIT_HASH` - Looks at patches between `HASH` (newest) and `INIT_HASH` (oldest) (inclusive, directions is newer -> older commits)
+- `--path-filter PATH_FILTER` - limit output to files matching PATH_FILTER (e.g. `src/t*.c`)
 
 ### Histogram
 Sample usage:

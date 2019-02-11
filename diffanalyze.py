@@ -4,6 +4,7 @@ import collections
 import getpass
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -265,7 +266,7 @@ class DiffSummary:
 # Handles all interactions with the git repository
 class RepoManager:
 
-    def __init__(self, repo_url, print_mode, save_json, track_json):
+    def __init__(self, repo_url, print_mode, save_json, track_json, path_filter):
         self.repo_url = repo_url
         self.allowed_extensions = ['.c']  # , '.h']
         self.print_mode = print_mode
@@ -274,6 +275,7 @@ class RepoManager:
         self.original_commit = None
         self.save_json = save_json
         self.track_json = track_json
+        self.path_filter = None if not path_filter else re.compile(path_filter)
 
     def get_repo_paths(self):
         # Path where repo is supposed to be
@@ -334,12 +336,13 @@ class RepoManager:
     def compute_diffs(self, patches, commit_new, commit_old, old_repo, new_repo, clone_old_path, clone_new_path):
         diff_summary = DiffSummary()
 
-        updated_fn_count = 0
         has_c_files = False
         has_updated_fn = False
 
         for patch in patches:
             filename = patch.delta.new_file.path
+            if self.path_filter and not self.path_filter.match(filename):
+                continue
 
             extension = FileDifferences.get_extension(filename)
             if extension not in self.allowed_extensions:
@@ -658,6 +661,7 @@ def main(main_args):
     parser.add_argument('--save-json', dest='json', action='store_true',
                         help='output function update information in JSON format')
     parser.add_argument('--track', dest='track', choices=['loc', 'diff'], default='diff', help='what data to save')
+    parser.add_argument('--path-filter', dest='path_filter', help='restrict output to paths matched by filter')
 
     # Dictionary of arguments
     args_orig = parser.parse_args(main_args)
@@ -668,7 +672,7 @@ def main(main_args):
     OutputManager.with_hash = bool(args['with_hash'])
     OutputManager.only_added = bool(args['only_added'])
 
-    repo_manager = RepoManager(args['gitrepo'], args['print'], bool(args['json']), args['track'])
+    repo_manager = RepoManager(args['gitrepo'], args['print'], bool(args['json']), args['track'], args['path_filter'])
 
     if args['revision']:
         repo_manager.compare_patches_in_range(args['revision'],args['range'])
