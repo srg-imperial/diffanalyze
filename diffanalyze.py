@@ -12,9 +12,24 @@ import tempfile
 from io import StringIO
 from os.path import dirname
 
-import matplotlib.pyplot as plt
 import pygit2
-from termcolor import colored
+
+# matplotlib
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    hasMatplotlib = False
+else:
+    hasMatplotlib = True
+
+# check colour support
+try:
+    from termcolor import colored
+except ModuleNotFoundError:
+    hasColourSupport = false
+else:
+    hasColourSupport = sys.stdout.isatty()
+
 
 GIT_EMPTY_TREE_ID = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
@@ -115,6 +130,10 @@ class FnAttributes:
 class FileDifferences:
 
     def __init__(self, filename, patch, old_path, new_path):
+        # find ctags
+        self.ctags = shutil.which('universalctags')
+        if not self.ctags:
+            self.ctags = shutil.which('ctags')
         self.filename = filename
         self.file_extension = FileDifferences.get_extension(filename)
         self.current_fn_map = self.get_fn_names(new_path)
@@ -132,7 +151,7 @@ class FileDifferences:
 
     def get_fn_names(self, path):
         proc = subprocess.Popen(
-            ['universalctags', '-x', '--c-kinds=fp', '--fields=+ne', '--output-format=json', os.path.join(path, self.filename)],
+            [self.ctags, '-x', '--c-kinds=fp', '--fields=+ne', '--output-format=json', os.path.join(path, self.filename)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         out, err = proc.communicate()
@@ -197,14 +216,14 @@ class FileDifferences:
 
         for fn_name, lines in self.fn_to_changed_lines.items():
             if pretty and lines:
-                if sys.stdout.isatty():
+                if hasColourSupport:
                     print('%s: In function %s' % (colored(self.filename, 'blue'), colored(fn_name, 'green')))
                 else:
                     print('{}: In function {}'.format(self.filename, fn_name))
                 self.fn_to_changed_lines[fn_name].print_added_lines()
                 self.fn_to_changed_lines[fn_name].print_removed_lines()
             elif lines:
-                if sys.stdout.isatty():
+                if hasColourSupport:
                     print('%s' % colored(fn_name, 'green'))
                 else:
                     print('%s' % fn_name)
@@ -233,7 +252,7 @@ class FileDifferences:
                 lines = list(set(lines))
             lines.sort()
             for line in lines:
-                if sys.stdout.isatty():
+                if hasColourSupport:
                     print('%s,%s,%s' % (colored(self.filename, 'blue'),(colored(fn_name, 'yellow')), line))
                 else:
                     print('{},{},{}'.format(self.filename, fn_name, line))
@@ -558,6 +577,7 @@ class RepoManager:
             os.mkdir('img/skip')
 
     def plot_fn_per_commit(self, skip):
+        assert(hasMatplotlib)
         ordered_dict = self.order_results()
         plt.figure(1)
         plot = plt.bar(ordered_dict.keys(), ordered_dict.values(), width=0.8, color='g')
@@ -569,6 +589,7 @@ class RepoManager:
         plt.savefig(path + 'function_commits.png', bbox_inches='tight')
 
     def plot_fn_per_commit_restricted(self, skip, limit):
+        assert(hasMatplotlib)
         ordered_dict = self.order_results()
         plt.figure(2)
 
@@ -589,6 +610,7 @@ class RepoManager:
         plt.savefig(path + 'function_commits_restricted.png', bbox_inches='tight')
 
     def plot_other_changed(self, skip):
+        assert(hasMatplotlib)
         ordered_other_dict = self.order_results(other=True)
         plt.figure(3)
         plot = plt.bar(ordered_other_dict.keys(), ordered_other_dict.values(), width=0.8, color='b')
@@ -688,6 +710,7 @@ def main(main_args):
         repo_manager.summary()
 
     if args['plot']:
+        assert(hasMatplotlib)
         plt.switch_backend('MacOSX')
         # manager = plt.get_current_fig_manager()
         # manager.window.showMaximized()

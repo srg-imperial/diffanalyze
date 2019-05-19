@@ -15,6 +15,6 @@ setup(
     version='0.1',
     packages=[],
     scripts=['diffanalyze.py'],
-    install_requires=['pygit2', 'matplotlib', 'termcolor'],
+    install_requires=['pygit2'],
     python_requires='>2.7',
 )
