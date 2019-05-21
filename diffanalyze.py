@@ -25,7 +25,7 @@ else:
 # check colour support
 try:
     from termcolor import colored
-except ModuleNotFoundError:
+except ImportError:
     hasColourSupport = false
 else:
     hasColourSupport = sys.stdout.isatty()
