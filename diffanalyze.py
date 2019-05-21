@@ -26,7 +26,7 @@ else:
 try:
     from termcolor import colored
 except ImportError:
-    hasColourSupport = false
+    hasColourSupport = False
 else:
     hasColourSupport = sys.stdout.isatty()
 
