@@ -17,7 +17,7 @@ import pygit2
 # matplotlib
 try:
     import matplotlib.pyplot as plt
-except ModuleNotFoundError:
+except ImportError:
     hasMatplotlib = False
 else:
     hasMatplotlib = True
