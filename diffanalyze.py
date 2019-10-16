@@ -299,7 +299,7 @@ class RepoManager:
     def get_repo_paths(self):
         # Path where repo is supposed to be
         cwd = os.getcwd()
-        return os.path.join(cwd, 'repo')
+        return os.path.join(cwd, 'repo'), os.path.join(cwd, 'repo_prev')
 
     # Handles the cloning of a repo
     def clone_repo(self, repo_path, rev=''):
@@ -418,7 +418,7 @@ class RepoManager:
         return diff_summary
 
     def compare_patches_in_range(self, start_revision, end_revision=None):
-        curr_repo_path = self.get_repo_paths()
+        curr_repo_path, _ = self.get_repo_paths()
         curr_repo = self.get_repo(curr_repo_path, start_revision)
 
         commit_new = curr_repo.revparse_single(start_revision)
@@ -428,7 +428,7 @@ class RepoManager:
         clone_new = tempfile.mkdtemp()
 
         # create clones:
-        orig_path = self.get_repo_paths()
+        orig_path, _ = self.get_repo_paths()
 
         proc = subprocess.Popen(
             ['git', 'clone', "file://" + orig_path, clone_old],
@@ -496,7 +496,7 @@ class RepoManager:
 
         updates_json = {}
 
-        curr_repo_path = self.get_repo_paths()
+        curr_repo_path, prev_repo_path = self.get_repo_paths()
 
         patch_repo = self.get_repo(curr_repo_path)
         original_repo = self.get_repo(prev_repo_path)
