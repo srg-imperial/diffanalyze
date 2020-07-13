@@ -456,16 +456,18 @@ class RepoManager:
         prev_commit = curr_repo.revparse_single(commit_old.hex)
         # Stop at the selected oldest
         walker.hide(commit_old.id)
+        diff_summary_list = []
         for commit in walker:
             diff = curr_repo.diff(commit.parents[0], commit, context_lines=0)
             diff_summary = self.compute_diffs(diff, commit, prev_commit, old_repo, new_repo, clone_old, clone_new)
+            diff_summary_list.append(diff_summary)
             prev_commit = commit
             OutputManager.print_relevant_diff(diff_summary, self.print_mode)
 
         shutil.rmtree(clone_old)
         shutil.rmtree(clone_new)
 
-
+        return diff_summary_list
 
 
     @staticmethod
