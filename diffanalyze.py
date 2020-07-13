@@ -346,7 +346,7 @@ class RepoManager:
         repo = pygit2.Repository(discover_repo_path)
 
         # A different repo is found
-        if repo.remotes['origin'].url != self.repo_url:
+        if repo.remotes['origin'].url != self.repo_url and repo.remotes['origin'].url != os.path.abspath(self.repo_url) :
             OutputManager.print("Found repo is incorrect. Should be:", self.repo_url, "but is:", repo.remotes['origin'].url)
             sys.exit(1)
 
