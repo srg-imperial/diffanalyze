@@ -134,6 +134,8 @@ class FileDifferences:
         self.ctags = shutil.which('universalctags')
         if not self.ctags:
             self.ctags = shutil.which('ctags')
+        if not self.ctags:
+            sys.exit('package universal-ctags not found.')
         self.filename = filename
         self.file_extension = FileDifferences.get_extension(filename)
         self.current_fn_map = self.get_fn_names(new_path)
