@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from collections import OrderedDict
+from pathlib import Path
 
 import pygit2
 import os
@@ -66,7 +67,7 @@ class FileAnalyzer:
         :return:
         """
         # Create tempfile for analysis
-        with tempfile.NamedTemporaryFile(suffix=filename) as tf:
+        with tempfile.NamedTemporaryFile(suffix=filename, dir=Path.home()) as tf:
             # Write content
             tf.write(blob)
             tf.flush()
