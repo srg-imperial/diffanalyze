@@ -177,7 +177,16 @@ def generate_repository_changes(url, new_revision, old_revision):
                             if not match:
                                 continue
 
-                            commit_change.setdefault(file_name, {}).setdefault(f['name'], []).append(
+                            diff_entry = commit_change.setdefault(file_name, {}).setdefault(f['name'], [])
+
+                            # Check if the last entry overlaps with this, in this case just update the end
+                            if len(diff_entry):
+                                (begin, end) = diff_entry[-1]
+                                if end == change_start:
+                                    diff_entry[-1] = (begin, change_end)
+                                    continue
+
+                            diff_entry.append(
                                 (change_start, change_end))
             changes.append((str(commit.id), commit_change))
 
