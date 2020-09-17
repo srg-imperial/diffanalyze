@@ -101,3 +101,7 @@ The matplotlib graphs can look weird when inspecting a small number (e.g. 4) of 
 * install dependencies: `pip3 install --user -e .`
 * Use ```python3 setup.py --user``` to install it
 * Use ```python3 setup.py --user develop``` for development
+
+## Libgit2 
+
+If `pygit2` is installed, make sure a `pip-19` or newer is installed (https://www.pygit2.org/install.html#quick-install)
