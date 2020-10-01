@@ -120,77 +120,81 @@ def generate_repository_changes(url, new_revision, old_revision):
 
         changes = []
         for commit in walker:  # type: pygit2.Commit
-            commit_change = {}
-
-            # Get parent commit if available otherwise use an empty tree commit
-            for parent_commit in get_parent_or_empty_commit(repository, commit):
-                patch_summary = gather_diff_information(repository, parent_commit, commit)
-                logging.debug("Commit {}".format(commit.id))
-
-                for single_change in patch_summary:
-                    # Skip entries that don't have a new file, i.e. no content was added/modified, old files have
-                    # been deleted
-                    if "new_file" not in single_change:
-                        continue
-
-                    file_name = single_change['new_file']
-                    file_blob = retrieve_file_from_commit(commit, file_name)
-
-                    if isinstance(file_blob, pygit2.Commit):
-                        logging.warning(
-                            "Submodule update detected {} but currently not supported.".format(file_blob.name))
-                        continue
-
-                    # Extract all the functions from the file, their start and their end
-                    # TODO Add name demangling to fully support C++
-                    file_structure = fa.analyse_blob(file_blob.data, file_blob.name)
-                    # Select name, start line and end line. `end line` might not be available assume large file
-                    functions = [{'name': f.get('name'), 'start': f.get('line'), 'end': f.get('end')} for f in
-                                 file_structure if f.get("kind", "") == "function"]
-
-                    # Iterate over all patch changes and check to which function they map
-                    for change in single_change['changes']:
-                        # Skip removals
-                        if change['add'] == -1:
-                            continue
-                        for f in functions:
-                            if not f['end']:
-                                logging.warning(
-                                    "Function end for {} unknown in commit {}. Ignoring.".format(f['name'], commit.id))
-                                continue
-                            match = False
-                            change_start = change['add']
-                            change_end = change_start + change['nr']
-
-                            # Check if the beginning of patch inside of the function
-                            if f['start'] <= change_start <= f['end']:
-                                match = True
-
-                            # Check if the end of the patch is inside the function
-                            if f['start'] <= change_end <= f['end']:
-                                match = True
-
-                            # Check if the function is inside the patch
-                            if change_start <= f['start'] <= change_end:
-                                match = True
-
-                            if not match:
-                                continue
-
-                            diff_entry = commit_change.setdefault(file_name, {}).setdefault(f['name'], [])
-
-                            # Check if the last entry overlaps with this, in this case just update the end
-                            if len(diff_entry):
-                                (begin, end) = diff_entry[-1]
-                                if end == change_start:
-                                    diff_entry[-1] = (begin, change_end)
-                                    continue
-
-                            diff_entry.append(
-                                (change_start, change_end))
+            commit_change = generate_commit_change(fa, repository, commit)
             changes.append((str(commit.id), commit_change))
 
     return changes
+
+def generate_commit_change(fa, repository, commit):
+    commit_change = {}
+
+    # Get parent commit if available otherwise use an empty tree commit
+    for parent_commit in get_parent_or_empty_commit(repository, commit):
+        patch_summary = gather_diff_information(repository, parent_commit, commit)
+        logging.debug("Commit {}".format(commit.id))
+
+        for single_change in patch_summary:
+            # Skip entries that don't have a new file, i.e. no content was added/modified, old files have
+            # been deleted
+            if "new_file" not in single_change:
+                continue
+
+            file_name = single_change['new_file']
+            file_blob = retrieve_file_from_commit(commit, file_name)
+
+            if isinstance(file_blob, pygit2.Commit):
+                logging.warning(
+                    "Submodule update detected {} but currently not supported.".format(file_blob.name))
+                continue
+
+            # Extract all the functions from the file, their start and their end
+            # TODO Add name demangling to fully support C++
+            file_structure = fa.analyse_blob(file_blob.data, file_blob.name)
+            # Select name, start line and end line. `end line` might not be available assume large file
+            functions = [{'name': f.get('name'), 'start': f.get('line'), 'end': f.get('end')} for f in
+                         file_structure if f.get("kind", "") == "function"]
+
+            # Iterate over all patch changes and check to which function they map
+            for change in single_change['changes']:
+                # Skip removals
+                if change['add'] == -1:
+                    continue
+                for f in functions:
+                    if not f['end']:
+                        logging.warning(
+                            "Function end for {} unknown in commit {}. Ignoring.".format(f['name'], commit.id))
+                        continue
+                    match = False
+                    change_start = change['add']
+                    change_end = change_start + change['nr']
+
+                    # Check if the beginning of patch inside of the function
+                    if f['start'] <= change_start <= f['end']:
+                        match = True
+
+                    # Check if the end of the patch is inside the function
+                    if f['start'] <= change_end <= f['end']:
+                        match = True
+
+                    # Check if the function is inside the patch
+                    if change_start <= f['start'] <= change_end:
+                        match = True
+
+                    if not match:
+                        continue
+
+                    diff_entry = commit_change.setdefault(file_name, {}).setdefault(f['name'], [])
+
+                    # Check if the last entry overlaps with this, in this case just update the end
+                    if len(diff_entry):
+                        (begin, end) = diff_entry[-1]
+                        if end == change_start:
+                            diff_entry[-1] = (begin, change_end)
+                            continue
+
+                    diff_entry.append(
+                        (change_start, change_end))
+    return commit_change
 
 
 def retrieve_file_from_commit(commit, file_name) -> pygit2.Blob:
