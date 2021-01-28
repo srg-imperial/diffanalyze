@@ -234,7 +234,7 @@ def gather_diff_information(repository, left_side_commit, right_side_commit):
     :param right_side_commit:
     :return: list of commit summaries
     """
-    diff: pygit2.Diff = repository.diff(left_side_commit, right_side_commit, context_lines=0)
+    diff: pygit2.Diff = repository.diff(left_side_commit, right_side_commit, context_lines=0, flags=pygit2.GIT_DIFF_IGNORE_WHITESPACE)
 
     commit_summary = []
     for patch in diff:  # type: pygit2.Patch
